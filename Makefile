@@ -9,7 +9,7 @@ CC_LIBS=-lpthread
 all: $(OUTPUT)
 
 $(OUTPUT): $(OUTPUT).c
-	$(CC) -o $(OUTPUT) $(CC_OPT) $(OUTPUT).c $(C_LIBS)
+	$(CC) -o $(OUTPUT) $(CC_OPT) $(OUTPUT).c $(CC_LIBS)
 
 .PHONY: clean
 clean:
