@@ -16,6 +16,9 @@
 /*pista de largura 10*/
 int *PISTA[10];
 
+/*relogio global: acertar o nome das variaveis clock*/
+int relogio = 0;
+
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 
 /*gera um numero aleatorio entre 0 e 99*/
@@ -87,12 +90,14 @@ int main(int argc, char *argv[])
     }
 
     /* SIMULADOR */
+    /* esse while só vai ser usado para incrementar o relogio global*/
     while (1) {
 
         usleep (timestep);
         clock += 1;
         
         /*testando*/
+        /*os sorteios vao pra dentro da funcao ciclista*/
         sucess = speed_lottery (clock, chance);
         if (sucess)
             speed = 90;
@@ -104,13 +109,27 @@ int main(int argc, char *argv[])
 
 /*---------------------------------------------------------------------------*/
 
+/**
+ *
+ *  cada thread/ciclista controlara sua corrida dentro do loop
+ *  a sincronizacao sera feita a cada dt = 120ms
+ *
+**/
+
 void *ciclista(void *arg) {
-  int id;
-  id = 0;
-  pthread_mutex_lock ( &mutex1 );
-  PISTA[0][1] = id;
-  pthread_mutex_unlock ( &mutex1 );
-  return NULL;
+    int id;
+    int dt;
+    id = 0;
+    dt = 100000;
+    while (1) {
+        /*atualiza status e escreve em PISTA 
+          e espera o proximo passo de tempo*/
+        usleep (dt);
+        pthread_mutex_lock ( &mutex1 );
+        PISTA[0][1] = id;
+        pthread_mutex_unlock ( &mutex1 );
+    }
+    return NULL;
 }
 
 /*gera aleatorios entre 0 e 99*/
