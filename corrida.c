@@ -13,6 +13,13 @@
 #define MAX_STRING 32
 #define EPSILON 0.0000000001
 
+typedef struct args {
+    int id;
+    int posicao;
+    int v;
+    int d;
+} args_ciclistas;
+
 /*pista de largura 10*/
 int *PISTA[10];
 
@@ -52,6 +59,9 @@ int main(int argc, char *argv[])
     int speed = 30;
     int chance = 30;
     
+    
+
+    args_ciclistas arg[6];
     /*PISTA de comprimento d e largura 10*/
     for (i = 0; i < 10; i++)
          PISTA[i] = mallocX((d) * sizeof(int));
@@ -72,6 +82,8 @@ int main(int argc, char *argv[])
         }
     }
 
+
+
     /*condicoes da corrida*/
     if ( (d <= 249) || (n <= 5) || (n > 5*d) || (v%20 != 0)) {
         fprintf (stderr,"Erro nas condicoes de entrada\n");
@@ -83,7 +95,12 @@ int main(int argc, char *argv[])
     threads = mallocX (n * sizeof(pthread_t));
     /*dispara os ciclistas (threads)*/
     for (i = 0; i < n; i++) {
-        if ( pthread_create( &threads[i], NULL, ciclista, NULL) ) {
+        arg[i].id = i;
+        arg[i].posicao = 0;
+        arg[i].v = v;
+        arg[i].d = d; 
+        /* PASSAR v (voltas), id dos ciclistas, d (tamanho da pista), posicao na pista como argumento */
+        if ( pthread_create( &threads[i], NULL, ciclista, (void*)&arg[i]) ) {
             printf("Erro ao criar thread.");
             abort ();
         }
@@ -104,6 +121,9 @@ int main(int argc, char *argv[])
         else speed = 30;
         fprintf (stderr,"clock: | : %d \t loteria: | %d\t%d\t%d\n", clock, chance,sucess,speed);
     }
+
+    /* FAZER JOIN NAS THREADS */
+
     return 0;
 }
 
@@ -117,18 +137,77 @@ int main(int argc, char *argv[])
 **/
 
 void *ciclista(void *arg) {
-    int id;
-    int dt;
-    id = 0;
-    dt = 100000;
+    int speed = 30;
+    int volta = 0;
+    int dt = 20;
+
+    int id = 0;
+    int tamanho = 250;
+    int voltas = 80;
+    int posicao = 0;
+
+    args_ciclistas *parametros = arg;
+
+    fprintf(stderr, "%d | %d | %d \n",parametros->id,parametros->posicao,parametros->v);
+
+    /* FAZER A STRUCT CERTA */
+    /*id = *arg;
+    posicao = *arg;
+    voltas = *arg;
+    tamanho = *arg;
+    */
     while (1) {
-        /*atualiza status e escreve em PISTA 
-          e espera o proximo passo de tempo*/
-        usleep (dt);
+        /* BARREIRA de 60ms */
+        if (relogio%(3*dt) == 0) {
+            if (speed == 60 && (relogio%(3*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
+            if (speed == 30 && (relogio%(6*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
+
+            /* ULTRAPASSAGEM */
+
+
+            /*pthread_barrier_wait(pthread_barrier_t *barrier);*/
+        }
+
+        else if ((voltas - volta <= 2) && relogio%dt == 0) {
+            if (speed == 30 && relogio%(6*dt) == 0) printf("");/* ATUALIZA A PISTA 1m */
+            if (speed == 60 && (relogio%(3*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
+            if (speed == 60 && (relogio%(2*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
+            
+
+            /* ULTRAPASSAGEM */
+            
+
+            /*pthread_barrier_wait(pthread_barrier_t *barrier);*/
+        }
+
+        if (posicao == tamanho) {
+            /*atualiza status e escreve em PISTA 
+              e espera o proximo passo de tempo*/
+            if (speed == 30)
+                if (speed_lottery (relogio, 70)) speed = 60;
+            
+            else if (speed == 60)
+                if (speed_lottery (relogio, 50)) speed = 30;
+        
+
+            /* VALIDO APENAS PARA 1 CICLISTA !!! */
+            if(voltas - volta <= 2)
+                if (speed_lottery (relogio, 10)) speed = 90;
+
+            volta++;
+            posicao = 0;
+        }
+
+        if(volta%15 == 0) /* PODE QUEBRAR */
+
+        if(volta == voltas)
+            break;
+
         pthread_mutex_lock ( &mutex1 );
         PISTA[0][1] = id;
         pthread_mutex_unlock ( &mutex1 );
     }
+
     return NULL;
 }
 
