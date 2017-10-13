@@ -129,6 +129,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < n; i++) {
         pthread_join(threads[i], NULL);
     }
+    pthread_barrier_destroy(&barreira_ciclo);
 
     return 0;
 }
