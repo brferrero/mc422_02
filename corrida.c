@@ -27,6 +27,7 @@ int *PISTA[10];
 int relogio = 0;
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_barrier_t barreira_ciclo;
 
 /*gera um numero aleatorio entre 0 e 99*/
 int lottery (int clock);
@@ -89,6 +90,9 @@ int main(int argc, char *argv[])
         fprintf (stderr,"Erro nas condicoes de entrada\n");
         exit (EXIT_FAILURE);
     }
+
+    /* Inicializa a barreira */
+    pthread_barrier_init(&barreira_ciclo, NULL, n);
     
     /*criar vetor de n threads*/
     /*pthread_t  thread_ciclistas[n];*/
@@ -122,7 +126,9 @@ int main(int argc, char *argv[])
         fprintf (stderr,"clock: | : %d \t loteria: | %d\t%d\t%d\n", clock, chance,sucess,speed);
     }
 
-    /* FAZER JOIN NAS THREADS */
+    for (i = 0; i < n; i++) {
+        pthread_join(threads[i], NULL);
+    }
 
     return 0;
 }
@@ -140,44 +146,64 @@ void *ciclista(void *arg) {
     int speed = 30;
     int volta = 0;
     int dt = 20;
-
-    int id = 0;
-    int tamanho = 250;
-    int voltas = 80;
-    int posicao = 0;
-
+    
     args_ciclistas *parametros = arg;
 
-    fprintf(stderr, "%d | %d | %d \n",parametros->id,parametros->posicao,parametros->v);
+    int id = parametros->id;
+    int tamanho = parametros->d;
+    int voltas = parametros->v;
+    int posicao = parametros->posicao;
 
-    /* FAZER A STRUCT CERTA */
-    /*id = *arg;
-    posicao = *arg;
-    voltas = *arg;
-    tamanho = *arg;
-    */
+    /* COLOCA OS CICLISTAS NA PISTA */
+    int corredor;
+    int i,j;
+    for(j = 0; j < tamanho; j++)
+        for(i = 0; i < 10; i++)
+            if (PISTA[i][j] == NULL)
+                break;
+    /* Primeiro slot livre */
+    corredor = i;
+    posicao = j;
+    PISTA[corredor][posicao] = id;
+
+    /* COMECA A CORRIDA */
     while (1) {
         /* BARREIRA de 60ms */
         if (relogio%(3*dt) == 0) {
-            if (speed == 60 && (relogio%(3*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
-            if (speed == 30 && (relogio%(6*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
+            if (speed == 60 && (relogio%(3*dt) == 0) && PISTA[corredor][posicao+1] == NULL) {
+                PISTA[corredor][posicao] = NULL;
+                PISTA[corredor][posicao+1] = id;
+            }
+            if (speed == 30 && (relogio%(6*dt) == 0) && PISTA[corredor][posicao+1] == NULL) {
+                PISTA[corredor][posicao] = NULL;
+                PISTA[corredor][posicao+1] = id;
+            }
 
             /* ULTRAPASSAGEM */
 
 
-            /*pthread_barrier_wait(pthread_barrier_t *barrier);*/
+            pthread_barrier_wait(&barreira_ciclo);
         }
 
+        /* BARREIRA de 20ms */
         else if ((voltas - volta <= 2) && relogio%dt == 0) {
-            if (speed == 30 && relogio%(6*dt) == 0) printf("");/* ATUALIZA A PISTA 1m */
-            if (speed == 60 && (relogio%(3*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
-            if (speed == 60 && (relogio%(2*dt) == 0)) printf("");/* ATUALIZA A PISTA 1m */
+            if (speed == 30 && (relogio%(6*dt) == 0) && PISTA[corredor][posicao+1] == NULL) {
+                PISTA[corredor][posicao] = NULL;
+                PISTA[corredor][posicao+1] = id;
+            }
+            if (speed == 60 && (relogio%(3*dt) == 0) && PISTA[corredor][posicao+1] == NULL) {
+                PISTA[corredor][posicao] = NULL;
+                PISTA[corredor][posicao+1] = id;
+            }
+            if (speed == 60 && (relogio%(2*dt) == 0) && PISTA[corredor][posicao+1] == NULL) {
+                PISTA[corredor][posicao] = NULL;
+                PISTA[corredor][posicao+1] = id;
+            }
             
 
             /* ULTRAPASSAGEM */
             
-
-            /*pthread_barrier_wait(pthread_barrier_t *barrier);*/
+            pthread_barrier_wait(&barreira_ciclo);
         }
 
         if (posicao == tamanho) {
