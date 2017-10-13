@@ -159,7 +159,7 @@ void *ciclista(void *arg) {
     int i,j;
     for(j = 0; j < tamanho; j++)
         for(i = 0; i < 10; i++)
-            if (PISTA[i][j] == NULL)
+            if (PISTA[i][j] == 0)
                 break;
     /* Primeiro slot livre */
     corredor = i;
@@ -203,12 +203,13 @@ void *ciclista(void *arg) {
         if (posicao == tamanho) {
             /*atualiza status e escreve em PISTA 
               e espera o proximo passo de tempo*/
-            if (speed == 30)
+            if (speed == 30) {
                 if (speed_lottery (relogio, 70)) speed = 60;
+            }
             
-            else if (speed == 60)
+            else if (speed == 60) {
                 if (speed_lottery (relogio, 50)) speed = 30;
-        
+            }
 
             /* VALIDO APENAS PARA 1 CICLISTA !!! */
             if(voltas - volta <= 2)
