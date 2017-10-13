@@ -2,7 +2,7 @@ OUTPUT=corrida
 
 CC=gcc
 
-CC_OPT=-std=c11 -Wall -ansi -pedantic -D _BSD_SOURCE
+CC_OPT=-Wall -pedantic
 CC_LIBS=-lpthread
 
 .PHONY: all
