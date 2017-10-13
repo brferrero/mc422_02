@@ -10,32 +10,34 @@
 #include <unistd.h>
 #include <string.h>
 
-#define MAX_STRING 32
-#define EPSILON 0.0000000001
+/*largura da pista: 10 raias*/
+#define LARGURA 10
 
-typedef struct args {
+typedef struct param_ciclistas {
     int id;
     int posicao;
     int v;
     int d;
-} args_ciclistas;
+} parametros_ciclistas;
 
 /*pista de largura 10*/
-int *PISTA[10];
+int *PISTA[LARGURA];
 
 /*relogio global: acertar o nome das variaveis clock*/
 int relogio = 0;
+int finished = 0;
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_barrier_t barreira_ciclo;
 
 /*gera um numero aleatorio entre 0 e 99*/
-int lottery (int clock);
+int lottery (int semente);
 /* recebe uma seed e uma chance (0-99)
- e devolve 1 se o sorteio teve sucesso com a chance dada*/
-int speed_lottery (int clock, int chance);
+   e devolve 1 se o sorteio teve sucesso com a chance dada*/
+int speed_lottery (int semente, int chance);
 
 void *ciclista (void *arg);
+void clear_pista (int d);
 
 /* www.ime.usp.br/~pf */
 void *mallocX (unsigned int nbytes);
@@ -45,92 +47,103 @@ int main(int argc, char *argv[])
 {
     pthread_t *threads;
     int i;
-    /*relógio arbitrário: milisegundo*/
-    int clock = 0;
-
     /*timestep da simulacao: 100000 -> 1 ms*/
     int timestep = 100000;
-    int sucess;
-    
+
     /* d metros, n ciclistas e v voltas*/
     int d = 250;
     int n = 6;
     int v = 80;
-    /* velocidade */
-    int speed = 30;
+    
+    /*paramentros dos ciclistas*/
+    parametros_ciclistas *arg;
+    
+    /* testes */
+    /*int speed = 30;
     int chance = 30;
-    
-    
+    int success;*/
 
-    args_ciclistas arg[6];
-    /*PISTA de comprimento d e largura 10*/
-    for (i = 0; i < 10; i++)
-         PISTA[i] = mallocX((d) * sizeof(int));
-
-    /* argumentos */
+    /* checando argumentos de entrada */
     if (argc  == 4) {
         d = atoi (argv[1]);
         n = atoi (argv[2]);
         v = atoi (argv[3]);
         printf ("Pista tamanho: %d | n ciclistas: %d| v voltas: %d \n", d, n, v);
-        /*exit(1);*/
     }
     else {
-        if (argc == 5) printf ("debug\n");
+        if (argc == 5) printf ("modo debug\n");
         else {
             fprintf (stderr,"Erro de entrada!\n");
             exit (EXIT_FAILURE);
         }
     }
 
-
-
-    /*condicoes da corrida*/
+    /* checando condicoes da corrida*/
     if ( (d <= 249) || (n <= 5) || (n > 5*d) || (v%20 != 0)) {
         fprintf (stderr,"Erro nas condicoes de entrada\n");
         exit (EXIT_FAILURE);
     }
 
-    /* Inicializa a barreira */
-    pthread_barrier_init(&barreira_ciclo, NULL, n);
+    /*teste*/
+    n = 3;
+    v = 4;
+    d = 5;
     
-    /*criar vetor de n threads*/
-    /*pthread_t  thread_ciclistas[n];*/
+    /* parametros de cada ciclista */
+    arg = mallocX (n * sizeof (parametros_ciclistas));
+
+    /*prepara a pista para a corrida*/
+    for (i = 0; i < LARGURA; i++)
+        PISTA[i] = mallocX((d) * sizeof(int));
+
+    /*zerando pista*/
+    clear_pista (d);
+
+    /* Inicializa a barreira */
+    pthread_barrier_init (&barreira_ciclo, NULL, n);
+
+    /*vetor de n threads*/
     threads = mallocX (n * sizeof(pthread_t));
+    
     /*dispara os ciclistas (threads)*/
     for (i = 0; i < n; i++) {
-        arg[i].id = i;
+        arg[i].id = i+1;
         arg[i].posicao = 0;
         arg[i].v = v;
         arg[i].d = d; 
-        /* PASSAR v (voltas), id dos ciclistas, d (tamanho da pista), posicao na pista como argumento */
         if ( pthread_create( &threads[i], NULL, ciclista, (void*)&arg[i]) ) {
             printf("Erro ao criar thread.");
             abort ();
         }
     }
 
-    /* SIMULADOR */
-    /* esse while só vai ser usado para incrementar o relogio global*/
+    /* SIMULADOR: "cronometro" */
     while (1) {
-
         usleep (timestep);
-        clock += 1;
-        
+        relogio += 1;
+        /*TODOS OS CICLISTAS TERMINARAM A CORRIDA*/
+        if (finished == n) 
+            break;
+
         /*testando*/
         /*os sorteios vao pra dentro da funcao ciclista*/
-        sucess = speed_lottery (clock, chance);
-        if (sucess)
+        /*success = speed_lottery (relogio, chance);
+        if (success)
             speed = 90;
         else speed = 30;
-        fprintf (stderr,"clock: | : %d \t loteria: | %d\t%d\t%d\n", clock, chance,sucess,speed);
+        fprintf (stderr,"relogio: | : %d \t loteria: | %d\t%d\t%d\n", relogio, chance,success,speed);*/
     }
 
-    for (i = 0; i < n; i++) {
+    /**/
+    for (i = 0; i < n; i++)
         pthread_join(threads[i], NULL);
-    }
-    pthread_barrier_destroy(&barreira_ciclo);
 
+    /*FREE*/
+    pthread_barrier_destroy (&barreira_ciclo);
+    for (i = 0; i < LARGURA; i++)
+        free (PISTA[i]);
+    free(threads);
+    free(arg);
     return 0;
 }
 
@@ -139,16 +152,16 @@ int main(int argc, char *argv[])
 /**
  *
  *  cada thread/ciclista controlara sua corrida dentro do loop
- *  a sincronizacao sera feita a cada dt = 120ms
+ *  a sincronizacao eh feita a cada ...
  *
-**/
+ **/
 
 void *ciclista(void *arg) {
     int speed = 30;
     int volta = 0;
     int dt = 20;
-    
-    args_ciclistas *parametros = arg;
+
+    parametros_ciclistas *parametros = arg;
 
     int id = parametros->id;
     int tamanho = parametros->d;
@@ -158,8 +171,9 @@ void *ciclista(void *arg) {
     /* COLOCA OS CICLISTAS NA PISTA */
     int corredor;
     int i,j;
-    for(j = 0; j < tamanho; j++)
-        for(i = 0; i < 10; i++)
+    printf ("id : %d\n",id);
+    for (j = 0; j < tamanho; j++)
+        for (i = 0; i < LARGURA; i++)
             if (PISTA[i][j] == 0)
                 break;
     /* Primeiro slot livre */
@@ -167,37 +181,44 @@ void *ciclista(void *arg) {
     posicao = j;
     PISTA[corredor][posicao] = id;
 
+    /*espera a largada*/
+    while (relogio == 0) continue;
     /* COMECA A CORRIDA */
     while (1) {
         /* BARREIRA de 60ms */
         if (relogio%(3*dt) == 0) {
             if (speed == 60 && (relogio%(3*dt) == 0) && PISTA[corredor][posicao+1] == 0) {
                 PISTA[corredor][posicao] = 0;
-                PISTA[corredor][posicao+1] = id;
+                PISTA[corredor][++posicao] = id;
             }
             if (speed == 30 && (relogio%(6*dt) == 0) && PISTA[corredor][posicao+1] == 0) {
                 PISTA[corredor][posicao] = 0;
-                PISTA[corredor][posicao+1] = id;
+                PISTA[corredor][++posicao] = id;
             }
+            posicao++;
+            printf ("id %d: Esperando em 60 : relogio: %d volta : %d\n", id, relogio,volta);
 
             pthread_barrier_wait(&barreira_ciclo);
+            if (posicao == tamanho) { volta++;posicao=0;}
+            if (volta >= voltas) break;
         }
 
         /* BARREIRA de 20ms */
         else if ((voltas - volta <= 2) && relogio%dt == 0) {
             if (speed == 30 && (relogio%(6*dt) == 0) && PISTA[corredor][posicao+1] == 0) {
                 PISTA[corredor][posicao] = 0;
-                PISTA[corredor][posicao+1] = id;
+                PISTA[corredor][++posicao] = id;
             }
             if (speed == 60 && (relogio%(3*dt) == 0) && PISTA[corredor][posicao+1] == 0) {
                 PISTA[corredor][posicao] = 0;
-                PISTA[corredor][posicao+1] = id;
+                PISTA[corredor][++posicao] = id;
             }
             if (speed == 60 && (relogio%(2*dt) == 0) && PISTA[corredor][posicao+1] == 0) {
                 PISTA[corredor][posicao] = 0;
-                PISTA[corredor][posicao+1] = id;
+                PISTA[corredor][++posicao] = id;
             }
-            
+
+            printf ("id %d: Esperando em 20 : relogio: %d volta: %d\n", id, relogio, volta);
             pthread_barrier_wait(&barreira_ciclo);
         }
 
@@ -207,7 +228,7 @@ void *ciclista(void *arg) {
             if (speed == 30) {
                 if (speed_lottery (relogio, 70)) speed = 60;
             }
-            
+
             else if (speed == 60) {
                 if (speed_lottery (relogio, 50)) speed = 30;
             }
@@ -217,36 +238,48 @@ void *ciclista(void *arg) {
                 if (speed_lottery (relogio, 10)) speed = 90;
 
             volta++;
+            printf ("id %d: Esperando em ultima volta : relogio: %d\n", id, relogio);
             posicao = 0;
+            if (volta >= voltas) break;
         }
 
-        if(volta%15 == 0) /* PODE QUEBRAR */
+        if(volta%15 == 0) break; /* PODE QUEBRAR */
 
-        if(volta == voltas)
+        /*terminou a corrida*/
+        if (volta == voltas)
+        {
+            pthread_mutex_lock ( &mutex1 );
+            finished++;
+            pthread_mutex_unlock ( &mutex1 );
             break;
-
-        pthread_mutex_lock ( &mutex1 );
-        PISTA[0][1] = id;
-        pthread_mutex_unlock ( &mutex1 );
+        }
     }
-
     return NULL;
 }
 
 /*gera aleatorios entre 0 e 99*/
-int lottery (int clock)
+int lottery (int semente)
 {
-    srand(clock+time(NULL));
+    srand(semente+time(NULL));
     return rand()%100;
 }
 
-int speed_lottery (int clock, int chance)
+int speed_lottery (int semente, int chance)
 {   
     int random;
-    random = lottery (clock);
+    random = lottery (semente);
     if (random < chance)
         return 1;
     else return 0;
+}
+
+/* esvazia a PISTA*/
+void clear_pista (int d)
+{ 
+    int i,j;
+    for (i = 0; i < LARGURA; i++)
+        for (j = 0; j < d; j++)
+            PISTA[i][j] = 0;
 }
 
 /* ~pf */
@@ -255,8 +288,8 @@ void *mallocX (unsigned int nbytes)
     void *ptr;
     ptr = malloc (nbytes);
     if (ptr == NULL) {
-	printf ("Socorro! malloc devolveu NULL!\n");
-	exit (EXIT_FAILURE);
+        printf ("Socorro! malloc devolveu NULL!\n");
+        abort ();
     }
     return ptr;
 }
