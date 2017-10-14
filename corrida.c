@@ -25,6 +25,7 @@ int *PISTA[LARGURA];
 
 int relogio_global = 0;
 int finished = 0;
+int ciclistas; /* condicao de encerramento */
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_barrier_t barreira_ciclo;
@@ -89,6 +90,7 @@ int main(int argc, char *argv[])
     n = 3;
     v = 3;
     d = 10;
+    ciclistas = n;
     
     /* parametros de cada ciclista */
     arg = mallocX (n * sizeof (parametros_ciclistas));
@@ -300,9 +302,8 @@ void *ciclista(void *arg) {
 
             /* Aguarda outros ciclistas terminarem */
             while(1) {
-                printf("[ID: %d] Tentando quebrar a barreira... finished = %d\n", id, finished);
                 pthread_barrier_wait(&barreira_ciclo);
-                if (finished == 3) return NULL;
+                if (finished == ciclistas) return NULL;
             }
         }
     }
