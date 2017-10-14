@@ -18,17 +18,23 @@ typedef struct param_ciclistas {
     int posicao;
     int v;
     int d;
+    int rank;
+    int clock;
+    int pontos;
 } parametros_ciclistas;
 
 /*pista de largura 10*/
 int *PISTA[LARGURA];
 int *quebrados;
+/*guarda o id dos ciclistas por ordem de chegada*/
+int *ranking;
 
 int relogio_global = 0;
 int finished = 0;
 int lottery_90 = 0;
 int ciclistas;
 int n;
+int pontuou=0;
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_barrier_t barreira_ciclo;
@@ -53,7 +59,7 @@ int main(int argc, char *argv[])
     pthread_t *threads;
     int i;
     /*timestep da simulacao: 100000 -> 1 ms*/
-    int timestep = 10000;
+    int timestep = 100;
 
     /* d metros, n ciclistas e v voltas*/
     int d = 250;
@@ -99,6 +105,9 @@ int main(int argc, char *argv[])
 
     /* Ciclistas quebrados */
     quebrados = mallocX((n - 5) * sizeof(int));
+    
+    /* ranking por ordem de chegada */
+    ranking = mallocX ((n) * sizeof(int));
 
     /*prepara a pista para a corrida*/
     for (i = 0; i < LARGURA; i++)
@@ -119,8 +128,12 @@ int main(int argc, char *argv[])
         arg[i].posicao = 0;
         arg[i].v = v;
         arg[i].d = d; 
+        arg[i].rank = -1;
+        arg[i].clock = -1;
+        arg[i].pontos = 0;
+        ranking[i] = -1;
         if ( pthread_create( &threads[i], NULL, ciclista, (void*)&arg[i]) ) {
-            printf("Erro ao criar thread.");
+            fprintf(stderr,"Erro ao criar thread.");
             abort ();
         }
     }
@@ -133,10 +146,11 @@ int main(int argc, char *argv[])
         if (finished == n) 
             break;
     }
-
     /**/
-    for (i = 0; i < n; i++)
+    for (i = 0; i < n; i++){
         pthread_join(threads[i], NULL);
+        printf("ID %2d: | rank: %2d | clock: %6d\n",arg[i].id,arg[i].rank,arg[i].clock);
+    }
 
     /*FREE*/
     pthread_barrier_destroy (&barreira_ciclo);
@@ -199,14 +213,12 @@ void *ciclista(void *arg) {
         /* BARREIRA de 60ms */
         if ((clock%(3*dt) == 0) && (clock != ultima_barreira) && (voltas - volta) > 2) {
             ultima_barreira = clock;
-            
+
             if (speed == 30 && (dx < 1)) dx++;
-
-            /* Ciclista ANDA */
+            /* CICLISTA VAI ANDAR */
             else {
                 distancia++;
                 dx = 0;
-
                 /* SECAO CRITICA! */
                 pthread_mutex_lock ( &mutex1 );
                 if (PISTA[raia][(posicao+1)%tamanho] == -1) {
@@ -214,78 +226,75 @@ void *ciclista(void *arg) {
                     posicao++;
                     PISTA[raia][posicao%tamanho] = id;
                 }
-
                 /* Verifica ultrapassagem */
-                else if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
-                    /* ultrapassou */
-                    fprintf(stderr, "\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
-                    for (i = raia; i < 10; i++) {
-                        if (PISTA[i][(posicao+1)%tamanho] == -1) {
-                            PISTA[raia][posicao%tamanho] = -1;
-                            posicao++;
-                            PISTA[i][posicao%tamanho] = id;
-                            raia = i;
-                            break;
+                else {
+                    if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
+                        /* ultrapassou */
+                        printf("\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
+                        for (i = raia; i < 10; i++) {
+                            if (PISTA[i][(posicao+1)%tamanho] == -1) {
+                                PISTA[raia][posicao%tamanho] = -1;
+                                posicao++;
+                                PISTA[i][posicao%tamanho] = id;
+                                raia = i;
+                                break;
+                            }
                         }
+                        /* Se nao conseguiu ultrapassar volta a 30km/h */
+                        if (i == 10) speed = 30;
                     }
-
-                    /* Se nao conseguiu ultrapassar volta a 30km/h */
-                    if (i == 10) speed = 30;
                 }
                 pthread_mutex_unlock ( &mutex1 );
                 /* END SECAO CRITICA*/
             }
             pthread_barrier_wait(&barreira_ciclo);
-
-            fprintf (stderr,"[ID %d] relogio: %d | d: %dm | lap: %d | s: %dkm/h \n",id,relogio_global,distancia,volta,speed);
+            printf ("[ID %2d] relogio: %d \t| d: %4dm | lap: %3d | s: %2dkm/h \n",id,relogio_global,distancia,volta,speed);
         }
+        /* BARREIRA 20ms; e se alguem teve sucesso com 90km/h */
+        else 
+            if ((clock%dt == 0) && (clock != ultima_barreira) && (voltas - volta) <= 2) {
+                ultima_barreira = clock;
 
-        /* BARREIRA 20ms */
-        else if ((clock%dt == 0) && (clock != ultima_barreira) && (voltas - volta) <= 2) {
-            ultima_barreira = clock;
-            
-            if (speed == 30 && (dx < 5)) dx++;
-            else if (speed == 60 && (dx < 2)) dx++;
-            else if (speed == 90 && (dx < 1)) dx++;
+                if (speed == 30 && (dx < 5)) dx++;
+                else if (speed == 60 && (dx < 2)) dx++;
+                else if (speed == 90 && (dx < 1)) dx++;
 
-            /* Ciclista ANDA */
-            else {
-                distancia++;
-                dx = 0;
-
-                /* SECAO CRITICA! */
-                pthread_mutex_lock ( &mutex1 );
-                if (PISTA[raia][(posicao+1)%tamanho] == -1) {
-                    PISTA[raia][posicao%tamanho] = -1;
-                    posicao++;
-                    PISTA[raia][posicao%tamanho] = id;
-                }
-
-                /* Verifica ultrapassagem */
-                else if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
-                    /* ultrapassou */
-                    fprintf(stderr, "\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
-                    for (i = raia; i < 10; i++) {
-                        if (PISTA[i][(posicao+1)%tamanho] == -1) {
-                            PISTA[raia][posicao%tamanho] = -1;
-                            posicao++;
-                            PISTA[i][posicao%tamanho] = id;
-                            raia = i;
-                            break;
+                /* Ciclista ANDA */
+                else {
+                    distancia++;
+                    dx = 0;
+                    /* SECAO CRITICA! */
+                    pthread_mutex_lock ( &mutex1 );
+                    if (PISTA[raia][(posicao+1)%tamanho] == -1) {
+                        PISTA[raia][posicao%tamanho] = -1;
+                        posicao++;
+                        PISTA[raia][posicao%tamanho] = id;
+                    }
+                    /* Verifica ultrapassagem */
+                    else {
+                        if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
+                            /* ultrapassou */
+                            printf("\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
+                            for (i = raia; i < 10; i++) {
+                                if (PISTA[i][(posicao+1)%tamanho] == -1) {
+                                    PISTA[raia][posicao%tamanho] = -1;
+                                    posicao++;
+                                    PISTA[i][posicao%tamanho] = id;
+                                    raia = i;
+                                    break;
+                                }
+                            }
+                            /* Se nao conseguiu ultrapassar volta a 30km/h */
+                            if (i == 10) speed = 30;
                         }
                     }
-
-                    /* Se nao conseguiu ultrapassar volta a 30km/h */
-                    if (i == 10) speed = 30;
+                    pthread_mutex_unlock ( &mutex1 );
+                    /* END SECAO CRITICA*/
                 }
-                pthread_mutex_unlock ( &mutex1 );
-                /* END SECAO CRITICA*/
+                pthread_barrier_wait(&barreira_ciclo);
+                printf ("[ID %2d] relogio: %d \t| d: %4dm | lap: %3d | s: %2dkm/h \n",id,relogio_global,distancia,volta,speed);
             }
-            pthread_barrier_wait(&barreira_ciclo);
-
-            fprintf (stderr,"[ID %d] relogio: %d | d: %dm | lap: %d | s: %dkm/h \n",id,relogio_global,distancia,volta,speed);
-        }
-
+        
         /* Completou uma volta */
         if (distancia == tamanho) {
             distancia = 0;
@@ -310,79 +319,36 @@ void *ciclista(void *arg) {
                 quebrados[n - ciclistas] = id;
                 ciclistas--;
                 pthread_mutex_unlock ( &mutex1 );
-                printf("\nCiclista [%d] quebrou\n",id);
+                fprintf(stderr,"\nCiclista [%d] quebrou na volta %d\n",id, volta);
                 while(1) {
                     pthread_barrier_wait(&barreira_ciclo);
                     if (finished == n) return NULL;
                 }
             }
         }
-
-     /*       
-            if (speed == 60 && (relogio_global%(3*dt) == 0) && PISTA[raia][posicao+1] == 0) {
-                PISTA[raia][posicao] = 0;
-                PISTA[raia][++posicao] = id;
-            }
-            if (speed == 30 && (relogio_global%(6*dt) == 0) && PISTA[raia][posicao+1] == 0) {
-                PISTA[raia][posicao] = 0;
-                PISTA[raia][++posicao] = id;
-            }
-            posicao++;
-            printf ("id %d: Esperando em 60 : relogio_global: %d volta : %d\n", id, relogio_global,volta);
-
-            pthread_barrier_wait(&barreira_ciclo);
-            if (posicao == tamanho) { volta++;posicao=0;}
-            if (volta >= voltas) break;
-        }
-    */
-        /* BARREIRA de 20ms */
-        /*
-        else if ((voltas - volta <= 2) && relogio_global%dt == 0) {
-            if (speed == 30 && (relogio_global%(6*dt) == 0) && PISTA[raia][posicao+1] == 0) {
-                PISTA[raia][posicao] = 0;
-                PISTA[raia][++posicao] = id;
-            }
-            if (speed == 60 && (relogio_global%(3*dt) == 0) && PISTA[raia][posicao+1] == 0) {
-                PISTA[raia][posicao] = 0;
-                PISTA[raia][++posicao] = id;
-            }
-            if (speed == 60 && (relogio_global%(2*dt) == 0) && PISTA[raia][posicao+1] == 0) {
-                PISTA[raia][posicao] = 0;
-                PISTA[raia][++posicao] = id;
-            }
-
-            printf ("id %d: Esperando em 20 : relogio_global: %d volta: %d\n", id, relogio_global, volta);
-            pthread_barrier_wait(&barreira_ciclo);
-        }
+        /*ATUALIZAR PONTUACAO:
+        *
+        * Somente 4 ciclistas pontuam por volta
         */
-        
-        /*
-        if (posicao == tamanho) {
-            if (speed == 30) {
-                if (speed_lottery (relogio_global, 70)) speed = 60;
-            }
-            else if (speed == 60) {
-                if (speed_lottery (relogio_global, 50)) speed = 30;
-            }
-
-             //VALIDO APENAS PARA 1 CICLISTA !!!
-            if (voltas - volta <= 2)
-                if (speed_lottery (relogio_global, 10)) speed = 90;
-            
-            volta++;
-            printf ("id %d: Esperando em ultima volta : relogio_global: %d\n", id, relogio_global);
-            posicao = 0;
-            if (volta >= voltas) break;
+        if (volta%10 == 0)
+        {
+            pthread_mutex_lock ( &mutex1 );
+            pontuou++;
+            pthread_mutex_unlock ( &mutex1 );
         }
-        */
-        /*
-        if(volta%15 == 0) break;
-        */
 
-        /*terminou a corrida*/
+        /* TERMINOU A CORRIDA */
         if (volta == voltas) {
             pthread_mutex_lock ( &mutex1 );
             finished++;
+            for (i = 0; i < n; i++){
+                if (ranking[i] == -1) {
+                    parametros->rank = i;
+                    parametros->clock = clock;
+                    ranking[i] = id;
+                    break;
+                    }
+            }
             pthread_mutex_unlock ( &mutex1 );
 
             /* Aguarda outros ciclistas terminarem */
@@ -426,7 +392,7 @@ void *mallocX (unsigned int nbytes)
     void *ptr;
     ptr = malloc (nbytes);
     if (ptr == NULL) {
-        printf ("Socorro! malloc devolveu NULL!\n");
+        fprintf (stderr,"Socorro! malloc devolveu NULL!\n");
         abort ();
     }
     return ptr;
