@@ -23,7 +23,7 @@ typedef struct param_ciclistas {
 /*pista de largura 10*/
 int *PISTA[LARGURA];
 
-/*relogio global: acertar o nome das variaveis clock*/
+/*relogio global:*/
 int relogio = 0;
 int finished = 0;
 
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     pthread_t *threads;
     int i;
     /*timestep da simulacao: 100000 -> 1 ms*/
-    int timestep = 10000;
+    int timestep = 100000;
 
     /* d metros, n ciclistas e v voltas*/
     int d = 250;
@@ -127,7 +127,6 @@ int main(int argc, char *argv[])
         if (finished == n) 
             break;
 
-        fprintf (stderr,"relogio: | : %d\n", relogio);
         /*testando*/
         /*os sorteios vao pra dentro da funcao ciclista*/
         /*success = speed_lottery (relogio, chance);
@@ -161,9 +160,14 @@ int main(int argc, char *argv[])
 
 void *ciclista(void *arg) {
     
+    int i, j;
     int speed = 30;
     int volta = 0;
     int dt = 20;
+    int distancia = 0;
+    int dx = 0;
+    /*relogio interno do ciclista*/
+    int clock = 60;
 
     parametros_ciclistas *parametros = arg;
 
@@ -173,7 +177,6 @@ void *ciclista(void *arg) {
     int posicao = parametros->posicao;
     int empty = 0;
     int raia;
-    int i,j;
 
     /* COLOCA OS CICLISTAS NA PISTA */
     pthread_mutex_lock ( &mutex1 );
@@ -198,7 +201,20 @@ void *ciclista(void *arg) {
     /* COMECA A CORRIDA */
     while (1) {
         /* BARREIRA de 60ms */
-        if (relogio%(3*dt) == 0) {
+        if (relogio%(3*dt) == 0 && relogio == clock) {
+            clock = clock + 3*dt;
+            printf ("ID: %d | relogio: %d\n",id,relogio);
+            if (speed == 30 && (dx != 2)) 
+                dx++;
+            else {
+                distancia++;
+                fprintf (stderr,"andou uma posicao a 30 | distancia : %d \n",distancia);
+                dx = 0;
+            }
+            pthread_barrier_wait(&barreira_ciclo);
+        }
+
+     /*       
             if (speed == 60 && (relogio%(3*dt) == 0) && PISTA[raia][posicao+1] == 0) {
                 PISTA[raia][posicao] = 0;
                 PISTA[raia][++posicao] = id;
@@ -214,7 +230,7 @@ void *ciclista(void *arg) {
             if (posicao == tamanho) { volta++;posicao=0;}
             if (volta >= voltas) break;
         }
-
+    */
         /* BARREIRA de 20ms */
         /*
         else if ((voltas - volta <= 2) && relogio%dt == 0) {
@@ -235,19 +251,17 @@ void *ciclista(void *arg) {
             pthread_barrier_wait(&barreira_ciclo);
         }
         */
+        
         if (posicao == tamanho) {
-            /*atualiza status e escreve em PISTA 
-              e espera o proximo passo de tempo*/
             if (speed == 30) {
                 if (speed_lottery (relogio, 70)) speed = 60;
             }
-
             else if (speed == 60) {
                 if (speed_lottery (relogio, 50)) speed = 30;
             }
 
-            /* VALIDO APENAS PARA 1 CICLISTA !!! */
-            if(voltas - volta <= 2)
+            /* VALIDO APENAS PARA 1 CICLISTA !!!*/
+            if (voltas - volta <= 2)
                 if (speed_lottery (relogio, 10)) speed = 90;
 
             volta++;
@@ -255,8 +269,9 @@ void *ciclista(void *arg) {
             posicao = 0;
             if (volta >= voltas) break;
         }
-
-        if(volta%15 == 0) break; /* PODE QUEBRAR */
+        /*
+        if(volta%15 == 0) break;
+        */
 
         /*terminou a corrida*/
         if (volta == voltas)
