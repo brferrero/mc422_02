@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     pthread_t *threads;
     int i;
     /*timestep da simulacao: 100000 -> 1 ms*/
-    int timestep = 50000;
+    int timestep = 10000;
 
     /* d metros, n ciclistas e v voltas*/
     int d = 250;
@@ -205,12 +205,26 @@ void *ciclista(void *arg) {
             if (speed == 30 && (dx != 2)) 
                 dx++;
             else {
-                clock = clock + 3*dt;
+                /*ciclista andou 1 metro: tenta marcar posicao na PISTA*/
                 distancia++;
-                fprintf (stderr,"ID: %d | relogio: %d  | clock: %d | distancia : %d \n",id,relogio,clock,distancia);
+                fprintf (stderr,"ID: %d | relogio: %d | distancia : %d | volta: %d | ",id,relogio,distancia,volta);
                 dx = 0;
+                clock = clock + 3*dt;
+                pthread_mutex_lock ( &mutex1 );
+                if (PISTA[raia][(posicao+1)%tamanho] == -1) {
+                    PISTA[raia][posicao%tamanho] = -1;
+                    posicao++;
+                    PISTA[raia][posicao%tamanho] = id;
+                    printf ("PISTA[%d][%d] = %d\n", raia, posicao%tamanho,PISTA[raia][posicao%tamanho]);
+                }
+                pthread_mutex_unlock ( &mutex1 );
             }
             pthread_barrier_wait(&barreira_ciclo);
+        }
+        /* Completou uma volta */
+        if (distancia == tamanho) {
+            distancia = 0;
+            volta++;
         }
 
      /*       
@@ -251,6 +265,7 @@ void *ciclista(void *arg) {
         }
         */
         
+        /*
         if (posicao == tamanho) {
             if (speed == 30) {
                 if (speed_lottery (relogio, 70)) speed = 60;
@@ -259,22 +274,22 @@ void *ciclista(void *arg) {
                 if (speed_lottery (relogio, 50)) speed = 30;
             }
 
-            /* VALIDO APENAS PARA 1 CICLISTA !!!*/
+             //VALIDO APENAS PARA 1 CICLISTA !!!
             if (voltas - volta <= 2)
                 if (speed_lottery (relogio, 10)) speed = 90;
-
+            
             volta++;
             printf ("id %d: Esperando em ultima volta : relogio: %d\n", id, relogio);
             posicao = 0;
             if (volta >= voltas) break;
         }
+        */
         /*
         if(volta%15 == 0) break;
         */
 
         /*terminou a corrida*/
-        if (volta == voltas)
-        {
+        if (volta == voltas) {
             pthread_mutex_lock ( &mutex1 );
             finished++;
             pthread_mutex_unlock ( &mutex1 );
