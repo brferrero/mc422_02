@@ -22,6 +22,7 @@ typedef struct param_ciclistas {
 
 /*pista de largura 10*/
 int *PISTA[LARGURA];
+int *quebrados;
 
 int relogio_global = 0;
 int finished = 0;
@@ -95,6 +96,9 @@ int main(int argc, char *argv[])
     
     /* parametros de cada ciclista */
     arg = mallocX (n * sizeof (parametros_ciclistas));
+
+    /* Ciclistas quebrados */
+    quebrados = mallocX((n - 5) * sizeof(int));
 
     /*prepara a pista para a corrida*/
     for (i = 0; i < LARGURA; i++)
@@ -303,6 +307,7 @@ void *ciclista(void *arg) {
             if (volta%15 == 0 && ciclistas > 5 && speed_lottery(id, 1)) {
                 finished++;
                 pthread_mutex_lock ( &mutex1 );
+                quebrados[n - ciclistas] = id;
                 ciclistas--;
                 pthread_mutex_unlock ( &mutex1 );
                 printf("\nCiclista [%d] quebrou\n",id);
