@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     pthread_t *threads;
     int i;
     /*timestep da simulacao: 100000 -> 1 ms*/
-    int timestep = 100000;
+    int timestep = 50000;
 
     /* d metros, n ciclistas e v voltas*/
     int d = 250;
@@ -202,13 +202,12 @@ void *ciclista(void *arg) {
     while (1) {
         /* BARREIRA de 60ms */
         if (relogio%(3*dt) == 0 && relogio == clock) {
-            clock = clock + 3*dt;
-            printf ("ID: %d | relogio: %d\n",id,relogio);
             if (speed == 30 && (dx != 2)) 
                 dx++;
             else {
+                clock = clock + 3*dt;
                 distancia++;
-                fprintf (stderr,"andou uma posicao a 30 | distancia : %d \n",distancia);
+                fprintf (stderr,"ID: %d | relogio: %d  | clock: %d | distancia : %d \n",id,relogio,clock,distancia);
                 dx = 0;
             }
             pthread_barrier_wait(&barreira_ciclo);
