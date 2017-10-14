@@ -26,7 +26,8 @@ int *PISTA[LARGURA];
 int relogio_global = 0;
 int finished = 0;
 int lottery_90 = 0;
-int ciclistas; /* condicao de encerramento */
+int ciclistas;
+int n;
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_barrier_t barreira_ciclo;
@@ -55,7 +56,6 @@ int main(int argc, char *argv[])
 
     /* d metros, n ciclistas e v voltas*/
     int d = 250;
-    int n = 6;
     int v = 80;
     
     /*paramentros dos ciclistas*/
@@ -212,9 +212,8 @@ void *ciclista(void *arg) {
                 }
 
                 /* Verifica ultrapassagem */
-                /* BUG ciclistas na ultima posicao da volta nao conseguem ultrapassar */
-                /* TODO voltar a usar multiplos das voltas na posicao da pista */
                 else if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
+                    /* ultrapassou */
                     fprintf(stderr, "\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
                     for (i = raia; i < 10; i++) {
                         if (PISTA[i][(posicao+1)%tamanho] == -1) {
@@ -259,9 +258,8 @@ void *ciclista(void *arg) {
                 }
 
                 /* Verifica ultrapassagem */
-                /* BUG ciclistas na ultima posicao da volta nao conseguem ultrapassar */
-                /* TODO voltar a usar multiplos das voltas na posicao da pista */
                 else if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
+                    /* ultrapassou */
                     fprintf(stderr, "\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
                     for (i = raia; i < 10; i++) {
                         if (PISTA[i][(posicao+1)%tamanho] == -1) {
@@ -301,7 +299,18 @@ void *ciclista(void *arg) {
             if (speed == 30 && speed_lottery(id, 70)) speed = 60;
             else if (speed == 60 && speed_lottery(id, 50)) speed = 30;
 
-            
+            /* verifica chance de quebrar */
+            if (volta%15 == 0 && ciclistas > 5 && speed_lottery(id, 1)) {
+                finished++;
+                pthread_mutex_lock ( &mutex1 );
+                ciclistas--;
+                pthread_mutex_unlock ( &mutex1 );
+                printf("\nCiclista [%d] quebrou\n",id);
+                while(1) {
+                    pthread_barrier_wait(&barreira_ciclo);
+                    if (finished == n) return NULL;
+                }
+            }
         }
 
      /*       
@@ -374,7 +383,7 @@ void *ciclista(void *arg) {
             /* Aguarda outros ciclistas terminarem */
             while(1) {
                 pthread_barrier_wait(&barreira_ciclo);
-                if (finished == ciclistas) return NULL;
+                if (finished == n) return NULL;
             }
         }
     }
