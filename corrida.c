@@ -25,6 +25,7 @@ int *PISTA[LARGURA];
 
 int relogio_global = 0;
 int finished = 0;
+int lottery_90 = 0;
 int ciclistas; /* condicao de encerramento */
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
@@ -87,7 +88,7 @@ int main(int argc, char *argv[])
     }
 
     /*teste*/
-    n = 3;
+    n = 15;
     v = 3;
     d = 10;
     ciclistas = n;
@@ -127,14 +128,6 @@ int main(int argc, char *argv[])
         /*TODOS OS CICLISTAS TERMINARAM A CORRIDA*/
         if (finished == n) 
             break;
-
-        /*testando*/
-        /*os sorteios vao pra dentro da funcao ciclista*/
-        /*success = speed_lottery (relogio_global, chance);
-        if (success)
-            speed = 90;
-        else speed = 30;
-        fprintf (stderr,"relogio_global: | : %d \t loteria: | %d\t%d\t%d\n", relogio_global, chance,success,speed);*/
     }
 
     /**/
@@ -200,37 +193,115 @@ void *ciclista(void *arg) {
         clock = relogio_global;
 
         /* BARREIRA de 60ms */
-        if ((clock%(3*dt) == 0) && (clock != ultima_barreira)) {
+        if ((clock%(3*dt) == 0) && (clock != ultima_barreira) && (voltas - volta) > 2) {
             ultima_barreira = clock;
             
-            if (speed == 30 && (dx == 0)) dx++;
+            if (speed == 30 && (dx < 1)) dx++;
 
             /* Ciclista ANDA */
             else {
                 distancia++;
                 dx = 0;
 
+                /* SECAO CRITICA! */
                 pthread_mutex_lock ( &mutex1 );
-                if (PISTA[raia][posicao+1] == -1) {
-                    PISTA[raia][posicao] = -1;
-                    PISTA[raia][++posicao] = id;
+                if (PISTA[raia][(posicao+1)%tamanho] == -1) {
+                    PISTA[raia][posicao%tamanho] = -1;
+                    posicao++;
+                    PISTA[raia][posicao%tamanho] = id;
+                }
+
+                /* Verifica ultrapassagem */
+                /* BUG ciclistas na ultima posicao da volta nao conseguem ultrapassar */
+                /* TODO voltar a usar multiplos das voltas na posicao da pista */
+                else if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
+                    fprintf(stderr, "\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
+                    for (i = raia; i < 10; i++) {
+                        if (PISTA[i][(posicao+1)%tamanho] == -1) {
+                            PISTA[raia][posicao%tamanho] = -1;
+                            posicao++;
+                            PISTA[i][posicao%tamanho] = id;
+                            raia = i;
+                            break;
+                        }
+                    }
+
+                    /* Se nao conseguiu ultrapassar volta a 30km/h */
+                    if (i == 10) speed = 30;
                 }
                 pthread_mutex_unlock ( &mutex1 );
+                /* END SECAO CRITICA*/
             }
             pthread_barrier_wait(&barreira_ciclo);
-            fprintf (stderr,"ID: %d | relogio: %d | d : %dm | v: %d | s: %dkm/h | finished: %d\n",id,relogio_global,distancia,volta,speed,finished);
+
+            fprintf (stderr,"[ID %d] relogio: %d | d: %dm | lap: %d | s: %dkm/h \n",id,relogio_global,distancia,volta,speed);
+        }
+
+        /* BARREIRA 20ms */
+        else if ((clock%dt == 0) && (clock != ultima_barreira) && (voltas - volta) <= 2) {
+            ultima_barreira = clock;
+            
+            if (speed == 30 && (dx < 5)) dx++;
+            else if (speed == 60 && (dx < 2)) dx++;
+            else if (speed == 90 && (dx < 1)) dx++;
+
+            /* Ciclista ANDA */
+            else {
+                distancia++;
+                dx = 0;
+
+                /* SECAO CRITICA! */
+                pthread_mutex_lock ( &mutex1 );
+                if (PISTA[raia][(posicao+1)%tamanho] == -1) {
+                    PISTA[raia][posicao%tamanho] = -1;
+                    posicao++;
+                    PISTA[raia][posicao%tamanho] = id;
+                }
+
+                /* Verifica ultrapassagem */
+                /* BUG ciclistas na ultima posicao da volta nao conseguem ultrapassar */
+                /* TODO voltar a usar multiplos das voltas na posicao da pista */
+                else if (speed == 60 && PISTA[raia][(posicao+1)%tamanho] != -1) {
+                    fprintf(stderr, "\nPISTA[%d][%d] = %d\n",raia,posicao+1,id);
+                    for (i = raia; i < 10; i++) {
+                        if (PISTA[i][(posicao+1)%tamanho] == -1) {
+                            PISTA[raia][posicao%tamanho] = -1;
+                            posicao++;
+                            PISTA[i][posicao%tamanho] = id;
+                            raia = i;
+                            break;
+                        }
+                    }
+
+                    /* Se nao conseguiu ultrapassar volta a 30km/h */
+                    if (i == 10) speed = 30;
+                }
+                pthread_mutex_unlock ( &mutex1 );
+                /* END SECAO CRITICA*/
+            }
+            pthread_barrier_wait(&barreira_ciclo);
+
+            fprintf (stderr,"[ID %d] relogio: %d | d: %dm | lap: %d | s: %dkm/h \n",id,relogio_global,distancia,volta,speed);
         }
 
         /* Completou uma volta */
         if (distancia == tamanho) {
             distancia = 0;
-            posicao = 0;
             volta++;
+
+            /* Sorteia velocidade 90 */
+            if ((voltas - volta) <= 2 && lottery_90 == 0 && speed_lottery(id, 10)) {
+                speed = 90;
+                pthread_mutex_lock ( &mutex1 );
+                lottery_90 = 1;
+                pthread_mutex_unlock ( &mutex1 );
+            }
 
             /* Sorteia nova velocidade */
             if (speed == 30 && speed_lottery(id, 70)) speed = 60;
             else if (speed == 60 && speed_lottery(id, 50)) speed = 30;
 
+            
         }
 
      /*       
