@@ -329,6 +329,10 @@ void *ciclista(void *arg) {
         /*ATUALIZAR PONTUACAO:
         *
         * Somente 4 ciclistas pontuam por volta
+        * precisa dar um jeito de verificar se todos os ciclistas 
+        * estao pontuando na mesma volta... checar a colocacao dele nesse instante com o vetor ranking
+        * e qndo esse vetor for todo preenchida precisa zerar ele novamente...
+        * 
         */
         if (volta%10 == 0)
         {
