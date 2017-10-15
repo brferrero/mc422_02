@@ -116,7 +116,8 @@ int main(int argc, char *argv[])
     }
 
     /*teste: hardcode*/
-    /*n = 10;
+    /*
+    n = 10;
     v = 80;
     d = 10;
     */
