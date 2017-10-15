@@ -1,6 +1,9 @@
 /*
  *
+ * Bruno Ferrero n.USP: 3690142  Curso: BCC
+ * Rodrigo Alves n.USP 6800149   Curso: BCC
  *
+ * Data: Out/2017
  *
  */
 

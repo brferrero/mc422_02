@@ -1,0 +1,27 @@
+/*
+ *
+ * Bruno Ferrero n.USP: 3690142  Curso: BCC
+ * Rodrigo Alves n.USP 6800149   Curso: BCC
+ *
+ * Data: Out/2017
+ *
+ */
+
+Compilar
+========
+make
+
+Execucao
+========
+./corrida 250 6 80
+
+
+$ tree
+.
+├── apresentacao.pdf
+├── corrida.c
+├── LEIAME
+├── Makefile
+
+Observacoes
+===========
