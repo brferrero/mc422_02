@@ -30,7 +30,7 @@ int *quebrados;
 int *ranking_tempo;
 int *ranking_pontos;
 /**/
-int **ranking_voltas;
+int **classificacao_por_volta;
 
 /*vetor usado para controlar os 4 ciclistas que vao pontuar %10 volta*/
 int *pontuacao;
@@ -56,8 +56,8 @@ void *ciclista (void *arg);
 /* zera matriz PISTA */ 
 void clear_pista (int d);
 void clear_pontuacao (int k);
-void clear_ranking_voltas (int v, int n);
-void print_ranking_voltas (int v, int n);
+void clear_classificacao_por_volta (int v, int n);
+void print_classificacao_por_volta (int v, int n);
 
 /*imprime status da PISTA*/
 void print_pista (int d);
@@ -120,9 +120,9 @@ int main(int argc, char *argv[])
     ranking_tempo = mallocX ((n) * sizeof(int));
     ranking_pontos = mallocX ((n) * sizeof(int));
     pontuacao = mallocX ((n) * sizeof(int));
-    ranking_voltas = (int **) malloc (v*sizeof(int*));
+    classificacao_por_volta = (int **) malloc (v*sizeof(int*));
     for (i = 0; i < v; i++) 
-        ranking_voltas[i] = mallocX (n *sizeof(int));
+        classificacao_por_volta[i] = mallocX (n *sizeof(int));
 
     /*prepara a pista para a corrida*/
     for (i = 0; i < LARGURA; i++)
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
     /*zerando pista*/
     clear_pista (d);
     clear_pontuacao (n);
-    clear_ranking_voltas (v, n);
+    clear_classificacao_por_volta (v, n);
 
     /* Inicializa a barreira */
     pthread_barrier_init (&barreira_ciclo, NULL, n);
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
         printf("ID %2d: | rank: %2d | clock: %6d | pontos: %3d\n",arg[i].id,arg[i].rank,arg[i].clock, arg[i].pontos);
     }
     */
-    print_ranking_voltas (v, n);
+    print_classificacao_por_volta (v, n);
 
     /*FREE*/
     pthread_barrier_destroy (&barreira_ciclo);
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
         free (PISTA[i]);
     
     for (i = 0; i < v; i++)
-        free (ranking_voltas[i]);
+        free (classificacao_por_volta[i]);
     free(threads);
     free(arg);
     free(ranking_tempo);
@@ -327,8 +327,8 @@ void *ciclista(void *arg) {
             /*registra na matriz a classificacao da volta*/
             pthread_mutex_lock ( &mutex1 );
             for (i = 0; i < n; i++) {
-                if (ranking_voltas[volta][i] == -1) {
-                    ranking_voltas[volta][i] = id;
+                if (classificacao_por_volta[volta][i] == -1) {
+                    classificacao_por_volta[volta][i] = id;
                     /*printf ("Ciclista %2d completou a volta %3d\n",id,volta);*/
                     break;
                 }
@@ -355,7 +355,7 @@ void *ciclista(void *arg) {
                 quebrados[n - ciclistas] = id;
                 ciclistas--;
                 pthread_mutex_unlock ( &mutex1 );
-                fprintf(stderr,"\nCiclista [%d] quebrou na volta %d\n",id, volta);
+                fprintf (stderr,"\nCiclista [%d] quebrou na volta %d\n",id, volta);
                 while(1) {
                     pthread_barrier_wait(&barreira_ciclo);
                     if (finished == n) return NULL;
@@ -363,7 +363,7 @@ void *ciclista(void *arg) {
             }
         }
         /* ATUALIZA PONTUACAO */
-        /* acho que nao vamos precisar desse if - da pra pontuar vendo a matrix ranking_voltas*/
+        /* acho que nao vamos precisar desse if - da pra pontuar vendo a matrix classificacao_por_volta*/
         if (volta%10 == 0 && volta > 0) {
             pthread_mutex_lock ( &mutex1 );
             for (i = 0; i < n && pontuacao[i] != id; i++) {
@@ -438,22 +438,22 @@ void clear_pontuacao (int k)
         pontuacao[i] = -1;
 }
 
-void clear_ranking_voltas (int v, int n)
+void clear_classificacao_por_volta (int v, int n)
 {
     int i,j;
     for (i = 0; i < v; i++) 
         for (j = 0; j < n; j++) 
-            ranking_voltas[i][j] = -1;
+            classificacao_por_volta[i][j] = -1;
 }
 
-void print_ranking_voltas (int v, int n)
+void print_classificacao_por_volta (int v, int n)
 {
     int i,j;
     printf ("Classificacao por volta:");
     for (i = 0; i < v; i++) {
         printf ("\nVolta %3d: ", i+1);
         for (j = 0; j < n; j++)
-            printf ("%2d | ", ranking_voltas[i][j]);
+            printf ("%2d | ", classificacao_por_volta[i][j]);
     }
     printf ("\n");
 }
