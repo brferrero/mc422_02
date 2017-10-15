@@ -25,11 +25,14 @@ typedef struct param_ciclistas {
 
 /*pista de largura 10*/
 int *PISTA[LARGURA];
+/*ciclistas quebrados*/
 int *quebrados;
+
 /*guarda o id dos ciclistas por ordem de chegada*/
 int *ranking_tempo;
 int *ranking_pontos;
-/**/
+
+/*guarda a classificacao de cada ciclista para cada volta*/
 int **classificacao_por_volta;
 
 /*vetor usado para controlar os 4 ciclistas que vao pontuar %10 volta*/
@@ -445,7 +448,7 @@ void clear_classificacao_por_volta (int v, int n)
         for (j = 0; j < n; j++) 
             classificacao_por_volta[i][j] = -1;
 }
-
+/* imprime a matriz classificacao por volta */
 void print_classificacao_por_volta (int v, int n)
 {
     int i,j;
