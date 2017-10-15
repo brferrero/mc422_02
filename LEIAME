@@ -22,6 +22,12 @@ $ tree
 ├── corrida.c
 ├── LEIAME
 ├── Makefile
+├── run_experiments.sh
+
 
 Observacoes
 ===========
+1) os experimentos foram realizados via perf
+2) para os graficos foram utilizados os tempos gerados pelo perf e o erro (%) para analise de erro
+3) também foi utilizado o numero de cpu da saída do perf
+
