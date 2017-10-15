@@ -365,25 +365,7 @@ void *ciclista(void *arg) {
                 }
             }
         }
-        /* ATUALIZA PONTUACAO */
-        /* acho que nao vamos precisar desse if - da pra pontuar vendo a matrix classificacao_por_volta*/
-        if (volta%10 == 0 && volta > 0) {
-            pthread_mutex_lock ( &mutex1 );
-            for (i = 0; i < n && pontuacao[i] != id; i++) {
-                if (pontuacao[i] == -1) {
-                    pontuacao[i] = id;
-                    parametros->pontos += pontua_sprint(i);
-                    break;
-                }
-            }
-            /*volta foi pontuada*/
-            if (i == n)
-            {
-                clear_pontuacao (n);
-            }
-            pthread_mutex_unlock ( &mutex1 );
-        }
-
+        
         /* TERMINOU A CORRIDA */
         if (volta == voltas) {
             pthread_mutex_lock ( &mutex1 );
