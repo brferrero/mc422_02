@@ -482,7 +482,7 @@ void soma_pontuacao (int k, int v)
 {
     int i,j;
     int pontos = 0;
-    for (i = 0; i < v; i++)
+    for (i = 9; i < v; i = i+10)
         for (j = 0;j < k; j++){
             pontos = pontua_sprint(j);
             pontuacao[classificacao_por_volta[i][j]-1] += pontos;
