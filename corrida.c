@@ -115,11 +115,11 @@ int main(int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
 
-    /*teste*/
-    n = 10;
-    v = 200;
+    /*teste: hardcode*/
+    /*n = 10;
+    v = 80;
     d = 10;
-    
+    */
     ciclistas = n;
     
     /* parametros de cada ciclista */
