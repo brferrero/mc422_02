@@ -21,6 +21,7 @@ typedef struct param_ciclistas {
     int rank;
     int clock;
     int pontos;
+    int quebrou;
 } parametros_ciclistas;
 
 /*pista de largura 10*/
@@ -44,6 +45,7 @@ int lottery_90 = 0;
 int ciclistas;
 int n;
 
+/*semaforo e barreira*/
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_barrier_t barreira_ciclo;
 
@@ -56,15 +58,17 @@ int speed_lottery (int semente, int chance);
 void *ciclista (void *arg);
 
 /* zera matriz PISTA */ 
-void clear_pista (int d);
-void clear_pontuacao (int k);
+void inicia_pista (int d);
+void imprime_pontuacao (int k, parametros_ciclistas *arg);
+void inicia_classificacao_por_volta (int v, int n);
+void imprime_classificacao_por_volta (int v, int n, parametros_ciclistas *arg);
+
+/**/
+void inicia_pontuacao (int k);
 void soma_pontuacao (int k, int v);
-void print_pontuacao (int k);
-void clear_classificacao_por_volta (int v, int n);
-void print_classificacao_por_volta (int v, int n);
 
 /*imprime status da PISTA*/
-void print_pista (int d);
+void imprime_pista (int d);
 
 /*recebe a colocacao do ciclista na volta e devolve o numero de pontos ganhado na volta*/
 int pontua_sprint (int colocacao);
@@ -78,13 +82,13 @@ int main(int argc, char *argv[])
     pthread_t *threads;
     int i;
     /*timestep da simulacao: 100000 -> 1 ms*/
-    int timestep = 100;
+    int timestep = 1;
 
     /* d metros, n ciclistas e v voltas*/
     int d = 250;
     int v = 80;
     
-    /*paramentros dos ciclistas*/
+    /*parametros dos ciclistas*/
     parametros_ciclistas *arg;
     
     /* checando argumentos de entrada */
@@ -109,9 +113,10 @@ int main(int argc, char *argv[])
     }
 
     /*teste*/
-    n = 8;
-    v = 60;
+    n = 10;
+    v = 200;
     d = 10;
+    
     ciclistas = n;
     
     /* parametros de cada ciclista */
@@ -122,6 +127,7 @@ int main(int argc, char *argv[])
     
     /* ranking por ordem de chegada */
     ranking_tempo = mallocX ((n) * sizeof(int));
+    /* ranking por pontos */
     ranking_pontos = mallocX ((n) * sizeof(int));
     pontuacao = mallocX ((n) * sizeof(int));
     classificacao_por_volta = (int **) malloc (v*sizeof(int*));
@@ -133,9 +139,9 @@ int main(int argc, char *argv[])
         PISTA[i] = mallocX((d) * sizeof(int));
     
     /*zerando pista*/
-    clear_pista (d);
-    clear_pontuacao (n);
-    clear_classificacao_por_volta (v, n);
+    inicia_pista (d);
+    inicia_pontuacao (n);
+    inicia_classificacao_por_volta (v, n);
 
     /* Inicializa a barreira */
     pthread_barrier_init (&barreira_ciclo, NULL, n);
@@ -152,6 +158,7 @@ int main(int argc, char *argv[])
         arg[i].rank = -1;
         arg[i].clock = -1;
         arg[i].pontos = 0;
+        arg[i].quebrou = 0;
         if ( pthread_create( &threads[i], NULL, ciclista, (void*)&arg[i]) ) {
             fprintf(stderr,"Erro ao criar thread.");
             abort ();
@@ -171,25 +178,26 @@ int main(int argc, char *argv[])
     /*
     for (i = 0; i < n; i++){
         pthread_join(threads[i], NULL);
-        printf("ID %2d: | rank: %2d | clock: %6d | pontos: %3d\n",arg[i].id,arg[i].rank,arg[i].clock, arg[i].pontos);
     }
     */
-    print_classificacao_por_volta (v, n);
-    soma_pontuacao(n, v);
-    print_pontuacao(n);
-
+    imprime_classificacao_por_volta (v, n,arg);
+    imprime_pontuacao (n, arg);
+    
+    soma_pontuacao (n, v);
+    /*
+    for (i = 0; i < n; i++){
+        printf("Ciclista %2d: | rank: %2d | clock: %6d | pontos: %3d\n",arg[i].id,arg[i].rank,arg[i].clock, arg[i].pontos);
+    }
+     */
     /*FREE*/
     pthread_barrier_destroy (&barreira_ciclo);
-    for (i = 0; i < LARGURA; i++)
-        free (PISTA[i]);
-    
-    for (i = 0; i < v; i++)
-        free (classificacao_por_volta[i]);
-    free(threads);
-    free(arg);
-    free(ranking_tempo);
-    free(ranking_pontos);
-    free(pontuacao);
+    for (i = 0; i < LARGURA; i++) free (PISTA[i]);
+    for (i = 0; i < v; i++) free (classificacao_por_volta[i]);
+    free (threads);
+    free (arg);
+    free (ranking_tempo);
+    free (ranking_pontos);
+    free (pontuacao);
 
     return 0;
 }
@@ -234,7 +242,7 @@ void *ciclista(void *arg) {
         }
     /* Primeiro slot livre */
     PISTA[raia][posicao] = id;
-    printf ("pista[%d][%d] = %d\n",raia,posicao,PISTA[raia][posicao]);
+    /*printf ("pista[%d][%d] = %d\n",raia,posicao,PISTA[raia][posicao]);*/
     pthread_mutex_unlock ( &mutex1 );
     pthread_barrier_wait(&barreira_ciclo);
     
@@ -341,6 +349,7 @@ void *ciclista(void *arg) {
                 }
             }
             pthread_mutex_unlock ( &mutex1 );
+            pthread_barrier_wait(&barreira_ciclo);
             volta++;
 
             /* Sorteia velocidade 90 */
@@ -357,10 +366,17 @@ void *ciclista(void *arg) {
 
             /* verifica chance de quebrar */
             if (volta%15 == 0 && ciclistas > 5 && speed_lottery(id, 1)) {
-                finished++;
                 pthread_mutex_lock ( &mutex1 );
+                finished++;
                 quebrados[n - ciclistas] = id;
                 ciclistas--;
+                /*marca o ciclista que quebrou na classificacao_por_volta*/
+                for (i = volta; i < voltas;i++)
+                    classificacao_por_volta[i][ciclistas] = id;
+                parametros->quebrou = 1;
+                parametros->id = id;
+                parametros->v = volta;
+                parametros->clock = clock;
                 pthread_mutex_unlock ( &mutex1 );
                 fprintf (stderr,"\nCiclista [%d] quebrou na volta %d\n",id, volta);
                 while(1) {
@@ -411,7 +427,7 @@ int speed_lottery (int semente, int chance)
 }
 
 /* esvazia a PISTA*/
-void clear_pista (int d)
+void inicia_pista (int d)
 { 
     int i,j;
     for (i = 0; i < LARGURA; i++)
@@ -419,15 +435,9 @@ void clear_pista (int d)
             PISTA[i][j] = -1;
 }
 
-/**/
-void clear_pontuacao (int k)
-{
-    int i;
-    for (i = 0; i < k; i++)
-        pontuacao[i] = 0;
-}
 
-void clear_classificacao_por_volta (int v, int n)
+/* inicia matriz classificacao_por_volta com -1*/
+void inicia_classificacao_por_volta (int v, int n)
 {
     int i,j;
     for (i = 0; i < v; i++) 
@@ -435,31 +445,24 @@ void clear_classificacao_por_volta (int v, int n)
             classificacao_por_volta[i][j] = -1;
 }
 /* imprime a matriz classificacao por volta */
-void print_classificacao_por_volta (int v, int n)
+void imprime_classificacao_por_volta (int v, int n, parametros_ciclistas *arg)
 {
     int i,j;
     printf ("Classificacao por volta:");
     for (i = 0; i < v; i++) {
-        printf ("\nVolta %3d: ", i+1);
-        for (j = 0; j < n; j++)
-            printf ("%2d | ", classificacao_por_volta[i][j]);
+        printf ("\nVolta %2d: ", i+1);
+        for (j = 0; j < n; j++) {
+            if ((i+1)%10 == 0) { 
+                arg[classificacao_por_volta[i][j]-1].pontos += pontua_sprint(j);
+                printf ("Id: %2d [%3d] | ", classificacao_por_volta[i][j],arg[classificacao_por_volta[i][j]-1].pontos);
+            }
+            else printf ("Id: %2d | ", classificacao_por_volta[i][j]);
+        }
     }
     printf ("\n");
 }
 
-void print_pista(int d)
-{
-    int i,j;
-    for (i = 0; i < LARGURA; i++) {
-        for (j = 0; j < d; j++)
-            if (PISTA[i][j] == -1)
-                printf (".");
-            else printf("%d",PISTA[j][j]);
-        printf("\n");
-    }
-}
-
-/**/
+/* pontos por ordem de chegada */
 int pontua_sprint (int colocacao)
 {
     int pontos;
@@ -473,28 +476,54 @@ int pontua_sprint (int colocacao)
     return pontos;
 }
 
+/*imprime a pontuacao final dos ciclistas e o tempo de chegada*/
+void imprime_pontuacao (int k, parametros_ciclistas *arg)
+{
+    int i;
+    for (i = 0; i < k; i++) {
+        if (arg[i].quebrou == 1)
+            printf("Ciclista: %2d | Pontos: %3d | Terminou em: %10d | Quebrou na volta %d\n",i+1, arg[i].pontos, arg[i].clock,arg[i].v);
+        else
+            printf("Ciclista: %2d | Pontos: %3d | Terminou em: %10d\n",i+1, arg[i].pontos, arg[i].clock);
+    }
+}
+
 /**/
 
-/* soma a pontuacao de cada ciclista
-* as posicoes dos vetores sao os ids dos
-* ciclistas */
+/* inicia vetor pontuacao com 0 */
+void inicia_pontuacao (int k)
+{
+    int i;
+    for (i = 0; i < k; i++)
+        pontuacao[i] = 0;
+}
+
+/* 
+ * soma a pontuacao de cada ciclista e gera classificacao
+*/
 void soma_pontuacao (int k, int v)
 {
     int i,j;
     int pontos = 0;
     for (i = 9; i < v; i = i+10)
-        for (j = 0;j < k; j++){
+        for (j = 0;j < k; j++) {
             pontos = pontua_sprint(j);
             pontuacao[classificacao_por_volta[i][j]-1] += pontos;
         }
 }
 
-void print_pontuacao (int k)
+void imprime_pista(int d)
 {
-    int i;
-    for (i = 0; i< k; i++)
-        printf("Ciclista: %2d | Pontos: %3d\n",i+1, pontuacao[i]);
+    int i,j;
+    for (i = 0; i < LARGURA; i++) {
+        for (j = 0; j < d; j++)
+            if (PISTA[i][j] == -1)
+                printf (".");
+            else printf("%d",PISTA[j][j]);
+        printf("\n");
+    }
 }
+
 
 /* ~pf */
 void *mallocX (unsigned int nbytes) 
