@@ -37,7 +37,6 @@ int **classificacao_por_volta;
 
 /*vetor usado para controlar os 4 ciclistas que vao pontuar %10 volta*/
 int *pontuacao;
-int volta_pontuada = 0;
 
 int relogio_global = 0;
 int finished = 0;
@@ -59,6 +58,8 @@ void *ciclista (void *arg);
 /* zera matriz PISTA */ 
 void clear_pista (int d);
 void clear_pontuacao (int k);
+void soma_pontuacao (int k, int v);
+void print_pontuacao (int k);
 void clear_classificacao_por_volta (int v, int n);
 void print_classificacao_por_volta (int v, int n);
 
@@ -174,6 +175,8 @@ int main(int argc, char *argv[])
     }
     */
     print_classificacao_por_volta (v, n);
+    soma_pontuacao(n, v);
+    print_pontuacao(n);
 
     /*FREE*/
     pthread_barrier_destroy (&barreira_ciclo);
@@ -186,6 +189,7 @@ int main(int argc, char *argv[])
     free(arg);
     free(ranking_tempo);
     free(ranking_pontos);
+    free(pontuacao);
 
     return 0;
 }
@@ -420,7 +424,7 @@ void clear_pontuacao (int k)
 {
     int i;
     for (i = 0; i < k; i++)
-        pontuacao[i] = -1;
+        pontuacao[i] = 0;
 }
 
 void clear_classificacao_por_volta (int v, int n)
@@ -467,6 +471,29 @@ int pontua_sprint (int colocacao)
         default : pontos = 0;
     }
     return pontos;
+}
+
+/**/
+
+/* soma a pontuacao de cada ciclista
+* as posicoes dos vetores sao os ids dos
+* ciclistas */
+void soma_pontuacao (int k, int v)
+{
+    int i,j;
+    int pontos = 0;
+    for (i = 0; i < v; i++)
+        for (j = 0;j < k; j++){
+            pontos = pontua_sprint(j);
+            pontuacao[classificacao_por_volta[i][j]-1] += pontos;
+        }
+}
+
+void print_pontuacao (int k)
+{
+    int i;
+    for (i = 0; i< k; i++)
+        printf("Ciclista: %2d | Pontos: %3d\n",i+1, pontuacao[i]);
 }
 
 /* ~pf */
